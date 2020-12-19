@@ -12,8 +12,6 @@ module.exports.createSession = (req, res, next) => {
         next();
         //check if there's a corresponding user
       } else {
-        // session is not valid
-
         sessions.create().then((result) => {
           sessions.get({ id: result.insertId }).then((session) => {
             req.session = session;

@@ -84,10 +84,11 @@ app.post('/login',
   (req, res, next) => {
     // req.body will contain username and password
     // get from user database, and pass salt and hashed password into compare
+    console.log('username: ', req.body.username);
     models.Users.get({username: req.body.username}).then((user) => {
       if (user) {
-        console.log('returned hashed password ' + user.password);
         if (models.Users.compare(req.body.password, user.password, user.salt)) {
+          models.Sessions.update({hash: req.session.hash}, {userId: user.id});
           res.location('/');
           res.render('index');
         } else {
@@ -95,7 +96,7 @@ app.post('/login',
           res.render('login');
         }
       } else {
-        console.log("User doesn't exist");
+        console.log('User doesn\'t exist');
         res.location('/login');
         res.render('login');
       }
@@ -107,7 +108,8 @@ app.post('/login',
 
 app.post('/signup',
   (req, res, next) => {
-    //
+    console.log('username: ', req.body.username);
+
     let {username, password} = req.body;
     models.Users.get({username: username}).then(user => {
       if (user) {
@@ -115,23 +117,31 @@ app.post('/signup',
         res.location('/signup');
         res.render('signup');
       } else {
-        models.Users.create({username, password});
-        res.location('/');
-        res.render('index');
+        models.Users.create({username, password}).then(results => {
+          //console.log("Result is: ", results);
+          console.log('Request session hash: ', req.session.hash);
+          models.Sessions.update({hash: req.session.hash}, {userId: results.insertId}).then(session => {
+            res.location('/');
+            res.render('index');
+          });
+        });
       }
     });
   }
 );
 
-// it('signup creates a new user record', function(done) {
-//   var options = {
-//     'method': 'POST',
-//     'uri': 'http://127.0.0.1:4568/signup',
-//     'json': {
-//       'username': 'Samantha',
-//       'password': 'Samantha'
-//     }
-//   };
+app.get('/logout',
+  (req, res, next) => {
+    //delete session from sessionDB
+    models.Sessions.delete({hash: req.session.hash}).then((result) => {
+      res.cookie('shortlyid', '');
+      res.location('/login');
+      res.render('login');
+    });
+    //get rid of sessions header and cookies header
+  }
+);
+
 /************************************************************/
 // Handle the code parameter route last - if all other routes fail
 // assume the route is a short code and try and handle it here.
