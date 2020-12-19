@@ -4,6 +4,7 @@ const utils = require('./lib/hashUtils');
 const partials = require('express-partials');
 const bodyParser = require('body-parser');
 const Auth = require('./middleware/auth');
+const cookieParser = require('./middleware/cookieParser.js');
 const models = require('./models');
 
 const app = express();
@@ -14,65 +15,67 @@ app.use(partials());
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, '../public')));
+app.use(cookieParser);
+app.use(Auth.createSession);
 
 
 
 app.get('/',
-(req, res) => {
-  res.render('index');
-});
+  (req, res) => {
+    res.render('index');
+  });
 
 app.get('/create',
-(req, res) => {
-  res.render('index');
-});
+  (req, res) => {
+    res.render('index');
+  });
 
 app.get('/links',
-(req, res, next) => {
-  models.Links.getAll()
-    .then(links => {
-      res.status(200).send(links);
-    })
-    .error(error => {
-      res.status(500).send(error);
-    });
-});
+  (req, res, next) => {
+    models.Links.getAll()
+      .then(links => {
+        res.status(200).send(links);
+      })
+      .error(error => {
+        res.status(500).send(error);
+      });
+  });
 
 app.post('/links',
-(req, res, next) => {
-  var url = req.body.url;
-  if (!models.Links.isValidUrl(url)) {
-    // send back a 404 if link is not valid
-    return res.sendStatus(404);
-  }
+  (req, res, next) => {
+    var url = req.body.url;
+    if (!models.Links.isValidUrl(url)) {
+      // send back a 404 if link is not valid
+      return res.sendStatus(404);
+    }
 
-  return models.Links.get({ url })
-    .then(link => {
-      if (link) {
+    return models.Links.get({ url })
+      .then(link => {
+        if (link) {
+          throw link;
+        }
+        return models.Links.getUrlTitle(url);
+      })
+      .then(title => {
+        return models.Links.create({
+          url: url,
+          title: title,
+          baseUrl: req.headers.origin
+        });
+      })
+      .then(results => {
+        return models.Links.get({ id: results.insertId });
+      })
+      .then(link => {
         throw link;
-      }
-      return models.Links.getUrlTitle(url);
-    })
-    .then(title => {
-      return models.Links.create({
-        url: url,
-        title: title,
-        baseUrl: req.headers.origin
+      })
+      .error(error => {
+        res.status(500).send(error);
+      })
+      .catch(link => {
+        res.status(200).send(link);
       });
-    })
-    .then(results => {
-      return models.Links.get({ id: results.insertId });
-    })
-    .then(link => {
-      throw link;
-    })
-    .error(error => {
-      res.status(500).send(error);
-    })
-    .catch(link => {
-      res.status(200).send(link);
-    });
-});
+  });
 
 /************************************************************/
 // Write your authentication routes here
@@ -81,13 +84,19 @@ app.post('/login',
   (req, res, next) => {
     // req.body will contain username and password
     // get from user database, and pass salt and hashed password into compare
-    models.User.get({username: req.body.username}).then((user) => {
+    models.Users.get({username: req.body.username}).then((user) => {
       if (user) {
-        if (models.User.compare(req.body.password, user.password, user.salt)) {
+        console.log('returned hashed password ' + user.password);
+        if (models.Users.compare(req.body.password, user.password, user.salt)) {
+          res.location('/');
           res.render('index');
+        } else {
+          res.location('/login');
+          res.render('login');
         }
       } else {
         console.log("User doesn't exist");
+        res.location('/login');
         res.render('login');
       }
     });
@@ -103,9 +112,11 @@ app.post('/signup',
     models.Users.get({username: username}).then(user => {
       if (user) {
         console.log('Username already taken');
+        res.location('/signup');
         res.render('signup');
       } else {
-        models.User.create({username, password});
+        models.Users.create({username, password});
+        res.location('/');
         res.render('index');
       }
     });
