@@ -26,7 +26,7 @@ class Users extends Model {
   /**
    * Creates a new user record with the given username and password.
    * This method creates a salt and hashes the password before storing
-   * the username, hashed password, and salt in the database.
+   * the username, hashed password, an`d salt in the database.
    * @param {Object} user - The user object.
    * @param {string} user.username - The user's username.
    * @param {string} user.password - The plaintext password.
