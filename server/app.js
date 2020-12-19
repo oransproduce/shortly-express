@@ -19,7 +19,7 @@ app.use(express.static(path.join(__dirname, '../public')));
 
 app.get('/',
 (req, res) => {
-  res.render('signup');
+  res.render('index');
 });
 
 app.get('/create',
@@ -79,16 +79,48 @@ app.post('/links',
 /************************************************************/
 app.post('/login',
   (req, res, next) => {
-
+    // req.body will contain username and password
+    // get from user database, and pass salt and hashed password into compare
+    models.User.get({username: req.body.username}).then((user) => {
+      if (user) {
+        if (models.User.compare(req.body.password, user.password, user.salt)) {
+          res.render('index');
+        }
+      } else {
+        console.log("User doesn't exist");
+        res.render('login');
+      }
+    });
+    // if (compare method (attempted, password, salt)
+    //res.render('index');
   }
 );
 
 app.post('/signup',
   (req, res, next) => {
-
+    //
+    let {username, password} = req.body;
+    models.Users.get({username: username}).then(user => {
+      if (user) {
+        console.log('Username already taken');
+        res.render('signup');
+      } else {
+        models.User.create({username, password});
+        res.render('index');
+      }
+    });
   }
 );
 
+// it('signup creates a new user record', function(done) {
+//   var options = {
+//     'method': 'POST',
+//     'uri': 'http://127.0.0.1:4568/signup',
+//     'json': {
+//       'username': 'Samantha',
+//       'password': 'Samantha'
+//     }
+//   };
 /************************************************************/
 // Handle the code parameter route last - if all other routes fail
 // assume the route is a short code and try and handle it here.
